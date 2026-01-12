@@ -46,15 +46,16 @@ sf-pypsa-sclopf/
 ## Model Components
 
 ### Buses (Substations)
-See https://openinframap.org/#11.14/37.7225/-122.3614 for a visualization of SF substaions. 
-- **Martin** (230kV): Main entry point at SF-Brisbane border
-- **Mission** (115kV): Failed December 2024 - at 8th & Mission
-- **Larkin** (115kV): Downtown substation
-- **Portrero** (115kV): Hub in Potrero Hill
-- **Embarcadero** (115kV): Financial District
-- **Hunters Point** (115kV): Southeast SF (Trans Bay Cable entry)
-- **Jefferson** (230 kV): 
-- **Egbert** (230kV): Planned
+Pulled data infrastructure from https://cecgis-caenergy.opendata.arcgis.com/search?categories=%252Fcategories%252Fenergy%2520infrastructure
+See https://openinframap.org/#11.14/37.7225/-122.3614 for a visualization of SF substations. 
+Based on OpenInfraMap and CEC GIS data showing actual substations:
+- Larkin 115kV Substation
+- Mission 115kV Substation  
+- Embarcadero 230kV Substation
+- Potrero Switchyard 230kV (next to Potrero Converter Station 200kV DC)
+- Bayshore 115kV Substation
+- Hunters Point 115kV Substation
+- Martin 230kV Substation
 
 ### Generators
 1. **Hetch Hetchy** (400 MW) - SFPUC hydropower from Yosemite
@@ -115,6 +116,8 @@ Total load: 650 MW (base)
 - [SCLOPF Example](https://pypsa.readthedocs.io/en/latest/examples/scigrid-sclopf.html)
 - [PG&E December 2024 Outage Report](https://www.pge.com/en/newsroom/currents/safety/pg-e-responding-to-power-outage-in-san-francisco-.html)
 - [SF Chronicle Coverage](https://www.sfchronicle.com/sf/article/pg-e-outage-40-000-customers-without-power-21254326.php)
+- [Trans-Bay Cable]( https://en.wikipedia.org/wiki/Trans_Bay_Cable)
+- [Transmission line data] (https://cecgis-caenergy.opendata.arcgis.com/datasets/CAEnergy::california-electric-transmission-lines-1/explore)
 
 ## Potential Enhancements
 

@@ -31,60 +31,50 @@ network.add("Carrier", "diesel")
 # =====================================================================
 # Sources: CPUC filings, PG&E website, CEC database
 buses = {
-    # Major 230kV/115kV Substation (70% of SF power goes through here)
+    # 230kV Substations (High Voltage Transmission)
     'Martin': {
-        'v_nom': 230,  # Both 230kV and 115kV
-        'x': -122.4159,  # Bayshore & Geneva (Brisbane/Daly City border)
+        'v_nom': 230,
+        'x': -122.4159,  # Bayshore & Geneva (confirmed)
         'y': 37.7089,
-        'note': '70% of SF power, main entry point'
+        'note': 'Main 230kV entry point, 70% of SF power'
+    },
+    'Embarcadero': {
+        'v_nom': 230,
+        'x': -122.3892,  # Financial District (you identified as 230kV)
+        'y': 37.7953,
+        'note': '230kV substation serving Financial District'
+    },
+    'Potrero_Switchyard': {
+        'v_nom': 230,
+        'x': -122.3898,  # Near Potrero Power Station site
+        'y': 37.7588,
+        'note': '230kV switchyard, adjacent to Potrero Converter (Trans Bay Cable)'
     },
     
-    # Failed during December 2024 outage
+    # 115kV Substations (Sub-Transmission)
     'Mission': {
         'v_nom': 115,
-        'x': -122.4102,  # 8th & Mission Streets
+        'x': -122.4102,  # 8th & Mission (failed Dec 2024)
         'y': 37.7775,
-        'note': 'Failed Dec 21, 2024 - 130K customers affected'
+        'note': '115kV substation, failed December 21, 2024'
     },
-    
-    # Major hub in Potrero Hill
-    'Potrero': {
+    'Larkin': {
         'v_nom': 115,
-        'x': -122.3953,  # 23rd Street, Potrero Hill
-        'y': 37.7588,
-        'note': 'Major distribution hub, near former power plant'
+        'x': -122.4194,  # Larkin St area 
+        'y': 37.7825,
+        'note': '115kV substation, downtown'
     },
-    
-    # Financial District
-    'Embarcadero': {
+    'Bayshore': {
         'v_nom': 115,
-        'x': -122.3892,  # Near Embarcadero/Financial District
-        'y': 37.7953,
-        'note': 'Serves 24K residential, 3K business accounts'
+        'x': -122.4035,  # Bayshore Blvd 
+        'y': 37.7420,
+        'note': '115kV substation, southern SF'
     },
-    
-    # Southeast SF
     'HuntersPoint': {
         'v_nom': 115,
-        'x': -122.3778,  # Evans Ave, Southeast SF
+        'x': -122.3778, 
         'y': 37.7306,
-        'note': 'Trans Bay Cable landing point, rebuilt 2006'
-    },
-    
-    # New switching station (under construction/planned)
-    'Egbert': {
-        'v_nom': 230,
-        'x': -122.3908,  # 1755 Egbert Avenue
-        'y': 37.7289,
-        'note': 'New backup for Martin Substation (planned/under construction)'
-    },
-    
-    # Northern transmission entry (inferred from grid topology)
-    'Jefferson': {
-        'v_nom': 230,
-        'x': -122.4700,  # Western SF, connects to Martin
-        'y': 37.7800,
-        'note': 'Northern 230kV entry point'
+        'note': '115kV substation, southeast SF'
     },
 }
 
@@ -96,41 +86,36 @@ for name, props in buses.items():
 # =====================================================================
 
 # Hetch Hetchy hydropower (SFPUC) - enters at Martin
-network.add("Generator", "HetchHetchy",
+network.add("Generator", "ExternalGridMartin",
             bus="Martin",
-            p_nom=400,  # MW capacity
-            marginal_cost=10,
-            carrier="hydro")
-
-# External PG&E grid connection
-network.add("Generator", "ExternalGrid_Martin",
-            bus="Martin",
-            p_nom=1200,
+            p_nom=1500,
             marginal_cost=50,
             carrier="external")
+print("  • External Grid @ Martin: 1,500 MW (230kV entry point)")
 
-# Northern entry point
-network.add("Generator", "ExternalGrid_Jefferson",
-            bus="Jefferson",
-            p_nom=300,
-            marginal_cost=55,
-            carrier="external")
-
-# Trans Bay Cable (400 MW underwater cable from Pittsburg) https://en.wikipedia.org/wiki/Trans_Bay_Cable
-# Lands at Hunters Point
+# Trans Bay Cable at Potrero Converter
+# Note: The 200kV DC converter connects to 230kV AC switchyard
 network.add("Generator", "TransBayCable",
-            bus="HuntersPoint",
-            p_nom=400,
+            bus="Potrero_Switchyard",
+            p_nom=400,  # 400 MW underwater cable from Pittsburg
             marginal_cost=40,
             carrier="cable")
+print("  • Trans Bay Cable @ Potrero: 400 MW (via DC converter)")
 
-# Emergency backup at Mission
+# Backup generation at critical substations
 network.add("Generator", "MissionBackup",
             bus="Mission",
             p_nom=50,
             marginal_cost=200,
             carrier="diesel")
+print("  • Emergency Backup @ Mission: 50 MW (diesel)")
 
+network.add("Generator", "EmbarcaderoBackup",
+            bus="Embarcadero",
+            p_nom=30,
+            marginal_cost=200,
+            carrier="diesel")
+print("  • Emergency Backup @ Embarcadero: 30 MW (diesel)")
 
 # =====================================================================
 # LOADS - Electricity demand. Based on known service areas
@@ -166,11 +151,12 @@ def realistic_load_profile(hours):
 load_profile = realistic_load_profile(hours)
 
 loads = {
-    'Mission': 200,        # SoMa/Mission - 130K customers affected in outage
-    'Potrero': 120,        # Potrero/Dogpatch distribution
-    'Embarcadero': 150,    # Financial District - 24K residential, 3K business
-    'HuntersPoint': 80,    # Southeast SF
-    'Egbert': 100,         # Southern neighborhoods served via Egbert
+    'Mission': 200,        # SoMa/Mission -
+    'Larkin': 150,        # DOwntown/ Civic center
+    'Embarcadero': 180,    # Financial District - 24K residential, 3K business
+    'Potrero_Switchyard': 100,  # Potrero/Dogpatch
+    'Bayshore': 120,      # Southern neighborhoods
+    'HuntersPoint': 80,   # Southeast SF
 }
 
 for name, base_load in loads.items():
@@ -185,29 +171,27 @@ for name, base_load in loads.items():
 # (bus0, bus1, length (km), s_nom (apparent power rating in megavolt-ampere MVA), r(resistance per km in ohm/km), x (reactance per km  in ohm/km))
 
 lines = [
-    # 230kV transmission backbone
-    ('Jefferson', 'Martin', 8, 500, 0.008, 0.08),  # Northern entry to Martin
-    ('Martin', 'Egbert', 10, 400, 0.01, 0.10),     # Martin to Egbert (new project)
+     # 230kV 
+    ('Martin', 'Potrero_Switchyard', 12, 600, 0.008, 0.08, '230kV-UG'),  # Underground
+    ('Martin', 'Embarcadero', 10, 500, 0.008, 0.08, '230kV-UG'),         # Underground
     
-    # Martin to 115kV substations (step-down transformers modeled as lines)
-    ('Martin', 'Mission', 15, 350, 0.01, 0.10),    # Critical path - failed Dec 2024
-    ('Martin', 'Potrero', 18, 300, 0.012, 0.11),   # Martin to Potrero
+    # 230kV to 115kV connections (transformers modeled as lines)
+    ('Martin', 'Mission', 15, 400, 0.01, 0.10, '230/115kV'),  # Step-down
+    ('Martin', 'Bayshore', 8, 350, 0.008, 0.08, '230/115kV'), # Step-down
+    ('Embarcadero', 'Larkin', 3, 300, 0.005, 0.04, '230/115kV'),  # Step-down
+    ('Potrero_Switchyard', 'HuntersPoint', 5, 300, 0.006, 0.05, '230/115kV'),  # Step-down
     
-    # Egbert connections (new reliability project)
-    ('Egbert', 'Embarcadero', 8, 300, 0.008, 0.08),
-    ('Egbert', 'HuntersPoint', 5, 250, 0.006, 0.06),
+    # 115kV Sub-transmission Network
+    ('Mission', 'Larkin', 3, 250, 0.005, 0.03, '115kV-UG'),    # Underground, downtown
+    ('Mission', 'Bayshore', 6, 200, 0.007, 0.06, '115kV-UG'),  # Underground
+    ('Larkin', 'Bayshore', 8, 180, 0.008, 0.07, '115kV-UG'),   # Underground
+    ('Bayshore', 'HuntersPoint', 7, 200, 0.008, 0.06, '115kV-UG'),  # Underground
     
-    # 115kV distribution network
-    ('Mission', 'Embarcadero', 4, 250, 0.005, 0.04),    # Mission to FiDi
-    ('Mission', 'Potrero', 5, 200, 0.006, 0.05),        # Mission to Potrero
-    ('Potrero', 'HuntersPoint', 6, 200, 0.007, 0.06),   # Potrero to Hunters Point
-    ('Embarcadero', 'Potrero', 5, 200, 0.006, 0.05),    # FiDi to Potrero
-    
-    # Trans Bay Cable connection
-    ('HuntersPoint', 'Potrero', 6, 400, 0.006, 0.05),   # TBC to grid
+    # Cross-connections 
+    ('Mission', 'Potrero_Switchyard', 5, 200, 0.006, 0.05, '115kV-UG'),  # Emergency path
 ]
 
-for i, (bus0, bus1, length, s_nom, r, x) in enumerate(lines):
+for i, (bus0, bus1, length, s_nom, r, x, line_type) in enumerate(lines):
     network.add("Line", f"Line_{i}_{bus0}_{bus1}",
                 bus0=bus0,
                 bus1=bus1,
@@ -283,13 +267,6 @@ print(f"\n   Security-constrained generation dispatch:")
 for gen in network.generators.index:
     gen_output = network.generators_t.p[gen].mean()
     print(f"     {gen}: {gen_output:.1f} MW (avg)")
-
-# Analyze the difference
-print("\n" + "=" * 70)
-print("3. COMPARISON: Standard LOPF vs Security-Constrained LOPF")
-print("=" * 70)
-print("  • SCLOPF ensures system survives any single line outage")
-print("  • May require more expensive generation or different dispatch")
 
 # =====================================================================
 # VISUALIZATIONS
@@ -392,29 +369,71 @@ ax3.contour(line_loading_pct.T, levels=[80], colors='red', linewidths=2, alpha=0
 
 
 # Plot 4: Total load vs generation
-# ax4 = fig.add_subplot(gs[2, 1])
+ax4 = fig.add_subplot(gs[2, 1])
 
-# max_loadings = line_loading_pct.max(axis=0)
-# print(line_loading_pct)
-# peak_hours = line_loading_pct.snapshot
+max_loadings = line_loading_pct.max(axis=0)
+peak_hours = line_loading_pct.idxmax(axis=0).apply(lambda x: x.hour)
 
-# colors = ['red' if x > 80 else 'orange' if x > 60 else 'green' 
-#           for x in max_loadings]
+colors = ['red' if x > 80 else 'orange' if x > 60 else 'green' 
+          for x in max_loadings]
 
-# bars = ax4.barh(range(len(max_loadings)), max_loadings, color=colors)
+bars = ax4.barh(range(len(max_loadings)), max_loadings, color=colors)
 
 # Add peak hour annotations
-# for i, (loading, hour) in enumerate(zip(max_loadings, peak_hours)):
-#     ax4.text(loading + 2, i, f"{hour}h", va='center', fontsize=7)
+for i, (loading, hour) in enumerate(zip(max_loadings, peak_hours)):
+    ax4.text(loading + 2, i, f"{hour}h", va='center', fontsize=7)
 
-# ax4.set_yticks(range(len(network.lines)))
-# ax4.set_yticklabels(line_names_short, fontsize=7)
-# ax4.set_xlabel("Maximum Loading (%)", fontsize=10)
-# ax4.set_title("Peak Line Loading\n(with hour of occurrence)", fontsize=11, fontweight='bold')
-# ax4.axvline(x=100, color='red', linestyle='--', linewidth=2, label='Capacity')
-# ax4.axvline(x=80, color='orange', linestyle='--', linewidth=2, label='High threshold')
-# ax4.legend(fontsize=8)
-# ax4.grid(True, alpha=0.3, axis='x')
+ax4.set_yticks(range(len(network.lines)))
+ax4.set_yticklabels(line_names_short, fontsize=7)
+ax4.set_xlabel("Maximum Loading (%)", fontsize=10)
+ax4.set_title("Peak Line Loading\n(with hour of occurrence)", fontsize=11, fontweight='bold')
+ax4.axvline(x=100, color='red', linestyle='--', linewidth=2, label='Capacity')
+ax4.axvline(x=80, color='orange', linestyle='--', linewidth=2, label='High threshold')
+ax4.legend(fontsize=8)
+ax4.grid(True, alpha=0.3, axis='x')
+
+# =====================================================================
+# PLOT 5: Load Profile vs Generation - FIXED with reserve
+# =====================================================================
+
+ax5 = fig.add_subplot(gs[2, 2])
+
+# Calculate totals
+total_gen = network.generators_t.p.sum(axis=1)
+total_load = network.loads_t.p.sum(axis=1)
+
+# Plot
+hours_array = network.snapshots.hour
+ax5.plot(hours_array, total_gen, linewidth=3, label='Total Generation', 
+         color='blue', marker='o', markersize=4)
+ax5.plot(hours_array, total_load, linewidth=3, label='Total Load', 
+         color='red', linestyle='--', marker='s', markersize=4)
+
+# Fill reserve area
+ax5.fill_between(hours_array, total_load, total_gen, 
+                 where=(total_gen >= total_load),
+                 alpha=0.3, color='green', label='Reserve Margin')
+
+ax5.set_title("Generation vs Load\n(with Reserve)", fontsize=11, fontweight='bold')
+ax5.set_xlabel("Hour of Day", fontsize=10)
+ax5.set_ylabel("Power (MW)", fontsize=10)
+ax5.legend(fontsize=9)
+ax5.grid(True, alpha=0.3)
+ax5.set_xlim(0, 23)
+
+# Add annotations for min and max
+min_load_idx = total_load.idxmin()
+max_load_idx = total_load.idxmax()
+ax5.annotate(f'Min Load\n{total_load.min():.0f} MW', 
+            xy=(min_load_idx.hour, total_load.min()),
+            xytext=(min_load_idx.hour + 2, total_load.min() - 30),
+            arrowprops=dict(arrowstyle='->', color='red'),
+            fontsize=8, color='red')
+ax5.annotate(f'Peak Load\n{total_load.max():.0f} MW', 
+            xy=(max_load_idx.hour, total_load.max()),
+            xytext=(max_load_idx.hour - 4, total_load.max() + 30),
+            arrowprops=dict(arrowstyle='->', color='red'),
+            fontsize=8, color='red')
 
 plt.tight_layout()
 plt.savefig('sf_grid_sclopf_analysis.png', dpi=300, bbox_inches='tight')
