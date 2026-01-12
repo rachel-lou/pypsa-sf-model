@@ -1,16 +1,16 @@
 # San Francisco Grid SCLOPF Project
 
-A PyPSA model for analyzing the San Francisco electrical grid using Security-Constrained Linear Optimal Power Flow (SCLOPF), developed in response to the December 2024 Mission substation fire that left 130,000 customers without power.
+A PyPSA model for analyzing the San Francisco electrical grid using Security-Constrained Linear Optimal Power Flow (SCLOPF), developed after the December 2024 Mission substation fire that left 130,000 customers without power.
 
 ## Background
 
 On December 21, 2024, a fire at PG&E's Mission substation (8th and Mission Streets) caused widespread outages affecting approximately 130,000 customers across San Francisco. The incident highlighted the need for better contingency planning and security-constrained optimization of the grid.
 
-## What is SCLOPF?
+## SCLOPF
 
 Security-Constrained Linear Optimal Power Flow ensures that:
 - The power system operates optimally under normal conditions
-- **No line becomes overloaded if any single branch fails** (N-1 security)
+- No line becomes overloaded if any single branch fails (N-1 security)
 - Generation is pre-positioned to handle contingencies
 - The system can survive equipment failures without cascading blackouts
 
@@ -36,7 +36,7 @@ pip install highspy  # Or use: conda install -c conda-forge coincbc
 sf-pypsa-sclopf/
 ├── sf_grid_model.py          # Main model script
 ├── README.md                 # This file
-├── data/                     # Data directory (optional)
+├── data/                     # Data directory 
 │   ├── load_profiles.csv    # Historical load data, to fill
 │   └── generation_data.csv  # Generation capacity data, to fill
 └── sf_grid_sclopf_analysis.png  # Visualizations
@@ -164,6 +164,3 @@ network.add("Generator", "DistributedSolar",
 6. Create a price responsive model.
 7. Wildfire scenarios relevant to CA
 
-## Contact
-
-For questions about PyPSA: https://groups.google.com/g/pypsa
