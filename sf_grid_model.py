@@ -91,16 +91,14 @@ network.add("Generator", "ExternalGridMartin",
             p_nom=1500,
             marginal_cost=50,
             carrier="external")
-print("  • External Grid @ Martin: 1,500 MW (230kV entry point)")
 
 # Trans Bay Cable at Potrero Converter
 # Note: The 200kV DC converter connects to 230kV AC switchyard
 network.add("Generator", "TransBayCable",
             bus="Potrero_Switchyard",
-            p_nom=400,  # 400 MW underwater cable from Pittsburg
+            p_nom=200,  # 400 MW underwater cable from Pittsburg
             marginal_cost=40,
             carrier="cable")
-print("  • Trans Bay Cable @ Potrero: 400 MW (via DC converter)")
 
 # Backup generation at critical substations
 network.add("Generator", "MissionBackup",
@@ -108,15 +106,36 @@ network.add("Generator", "MissionBackup",
             p_nom=50,
             marginal_cost=200,
             carrier="diesel")
-print("  • Emergency Backup @ Mission: 50 MW (diesel)")
 
 network.add("Generator", "EmbarcaderoBackup",
             bus="Embarcadero",
             p_nom=30,
             marginal_cost=200,
             carrier="diesel")
-print("  • Emergency Backup @ Embarcadero: 30 MW (diesel)")
 
+# Create solar generation profile (only generates during daylight)
+solar_profile = np.zeros(24)
+for hour in range(24):
+    if 6 <= hour <= 18:  # Sunrise ~6 AM, Sunset ~6 PM (December)
+        # Peak at solar noon (12 PM)
+        solar_profile[hour] = np.sin((hour - 6) * np.pi / 12)
+    else:
+        solar_profile[hour] = 0
+
+network.add("Generator", "SunsetReservoir_Solar",
+            bus="Mission",  # Western SF, assign to Mission area
+            p_nom=5,
+            p_max_pu=solar_profile,  # Time-varying availability
+            marginal_cost=0,  # Solar has zero fuel cost
+            carrier="solar")
+print("  • Sunset Reservoir Solar: 5 MW (peak)")
+# Distributed PV generation across SF
+network.add("Generator", "Distributed_PV",
+            bus="Larkin",  # Central SF location
+            p_nom=38.77,  # 8,710 private sites
+            p_max_pu=solar_profile,  # Same solar profile
+            marginal_cost=0,
+            carrier="solar")
 # =====================================================================
 # LOADS - Electricity demand. Based on known service areas
 # =====================================================================
@@ -130,7 +149,7 @@ hours = network.snapshots
 # load_profile = .6 + 0.4 * np.sin((hours.hour - 6) * np.pi / 12)
 # Range: 50% to 100% of base load: Typical daily variation for urban areas
 # load_profile = np.maximum(load_profile, 0.5)
-def realistic_load_profile(hours):
+def sf_load_profile(hours):
     """Create realistic daily load profile"""
     profile = np.zeros(len(hours))
     
@@ -148,18 +167,19 @@ def realistic_load_profile(hours):
     
     return profile
 
-load_profile = realistic_load_profile(hours)
-
-loads = {
-    'Mission': 200,        # SoMa/Mission -
-    'Larkin': 150,        # DOwntown/ Civic center
-    'Embarcadero': 180,    # Financial District - 24K residential, 3K business
-    'Potrero_Switchyard': 100,  # Potrero/Dogpatch
-    'Bayshore': 120,      # Southern neighborhoods
-    'HuntersPoint': 80,   # Southeast SF
+load_profile = sf_load_profile(hours)
+average_load_mw = 750  # 18,000 MWh / 24 hours
+load_distribution = {
+    'Mission': 0.24 * 1.5,        # SoMa/Mission district (large, dense, commercial)
+    'Larkin': 0.18,         # Downtown/Civic Center
+    'Embarcadero': 0.22,    # Financial District (major commercial)
+    'Potrero_Switchyard': 0.13,  # Potrero/Dogpatch
+    'Bayshore': 0.14,       # Southern neighborhoods
+    'HuntersPoint': 0.09,   # Southeast SF
 }
 
-for name, base_load in loads.items():
+for name, fraction in load_distribution.items():
+    base_load = average_load_mw * fraction
     p_set = base_load * load_profile
     network.add("Load", f"Load_{name}",
                 bus=name,
@@ -172,8 +192,8 @@ for name, base_load in loads.items():
 
 lines = [
      # 230kV 
-    ('Martin', 'Potrero_Switchyard', 12, 600, 0.008, 0.08, '230kV-UG'),  # Underground
-    ('Martin', 'Embarcadero', 10, 500, 0.008, 0.08, '230kV-UG'),         # Underground
+    ('Martin', 'Potrero_Switchyard', 12, 400, 0.008, 0.08, '230kV-UG'),  # Underground
+    ('Martin', 'Embarcadero', 10, 300, 0.008, 0.08, '230kV-UG'),         # Underground
     
     # 230kV to 115kV connections (transformers modeled as lines)
     ('Martin', 'Mission', 15, 400, 0.01, 0.10, '230/115kV'),  # Step-down
@@ -210,7 +230,7 @@ print("SAN FRANCISCO GRID SECURITY-CONSTRAINED OPTIMAL POWER FLOW")
 print("=" * 70)
 print(f"\nNetwork: {len(network.buses)} buses, {len(network.lines)} lines")
 print(f"Generators: {len(network.generators)}")
-print(f"Total load: {sum(loads.values()):.0f} MW (base)")
+print(f"Total load: {sum(load_distribution.values()):.0f} MW (base)")
 print("\n" + "=" * 70)
 
 # First, run standard LOPF to establish baseline
@@ -233,13 +253,6 @@ for gen in network.generators.index:
 # Line loadings
 print(f"\n   Critical line loadings:")
 line_loading = network.lines_t.p0.abs() / network.lines.s_nom * 100
-
-# Focus on Martin lines (critical)
-martin_lines = [line for line in network.lines.index if 'Martin' in line]
-for line in martin_lines:
-    max_load = line_loading[line].max()
-    status = " HIGH" if max_load > 80 else " OK"
-    print(f"     {line}: {max_load:.1f}% {status}")
 
 # =====================================================================
 # SECURITY-CONSTRAINED LOPF (SCLOPF)
@@ -358,8 +371,11 @@ ax3.set_yticks(range(len(network.lines)))
 ax3.set_yticklabels(line_names_short, fontsize=7)
 ax3.set_xlabel("Hour of Day", fontsize=10)
 ax3.set_title("Line Loading Heatmap (%)", fontsize=11, fontweight='bold')
-ax3.set_xticks(range(0, 24, 3))
-ax3.set_xticklabels(range(0, 24, 3))
+hour_ticks = range(0, 24, 3)  # 0, 3, 6, 9, 12, 15, 18, 21
+hour_labels = [f'{h:02d}:00' for h in hour_ticks]  # '00:00', '03:00', '06:00', etc.
+
+ax3.set_xticks(hour_ticks)
+ax3.set_xticklabels(hour_labels)
 # Add colorbar
 cbar = plt.colorbar(im, ax=ax3)
 cbar.set_label('Loading (%)', fontsize=9)
@@ -404,23 +420,19 @@ total_load = network.loads_t.p.sum(axis=1)
 
 # Plot
 hours_array = network.snapshots.hour
-ax5.plot(hours_array, total_gen, linewidth=3, label='Total Generation', 
-         color='blue', marker='o', markersize=4)
+# ax5.plot(hours_array, total_gen, linewidth=3, label='Total Generation', 
+#          color='blue', marker='o', markersize=4)
 ax5.plot(hours_array, total_load, linewidth=3, label='Total Load', 
          color='red', linestyle='--', marker='s', markersize=4)
 
-# Fill reserve area
-ax5.fill_between(hours_array, total_load, total_gen, 
-                 where=(total_gen >= total_load),
-                 alpha=0.3, color='green', label='Reserve Margin')
 
-ax5.set_title("Generation vs Load\n(with Reserve)", fontsize=11, fontweight='bold')
+ax5.set_title( "24 Hour Load Profile", fontsize=11, fontweight='bold')
 ax5.set_xlabel("Hour of Day", fontsize=10)
 ax5.set_ylabel("Power (MW)", fontsize=10)
 ax5.legend(fontsize=9)
 ax5.grid(True, alpha=0.3)
-ax5.set_xlim(0, 23)
-
+ax5.set_xticks(hour_ticks)
+ax5.set_xticklabels(hour_labels)
 # Add annotations for min and max
 min_load_idx = total_load.idxmin()
 max_load_idx = total_load.idxmax()
